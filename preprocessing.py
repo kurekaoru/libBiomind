@@ -19,7 +19,6 @@ def writeMoses(Dataobj, filename, delim):
 
 def writeSVM(Dataobj, filename):
 		outfile = open(filename,'w')
-		#FEATUREINDEX = range(1:len(Dataobj[0]))
 		DATA = Dataobj[1:]
 		for x in DATA:
 			outfile.write(x[0])
@@ -51,13 +50,16 @@ def preprocess(argv):
 			print 'test.py -i <inputfile> -o <outputfile>'
 			sys.exit()
 		elif opt in ("-i", "--ifile"):
-			supported_itype = {	'dat'	:'Generic flatfile',
+			supported_itype = {
+						'dat'	:'Generic flatfile',
 						'data'	:'Generic flatfile',
 						'txt'	:'Generic flatfile',
+						'tab'	:'Generic flatfile',
 						'soft'	:'NCBI microarray geo soft format',
 						'moses'	:'MOSES learning set format',
-						'svm'	:'libsvm specified svm format'
-					}
+						'svm'	:'libsvm specified svm format',
+						'snp'	:'Tab-delimited SNP flatfile'
+						}
 			ifile = arg
 			itype = arg.split('.')[-1]
 			print 'INPUT FILE NAME: '
@@ -94,6 +96,9 @@ def preprocess(argv):
 		ofile = fileStem+'.'+otype
 	D_Obj = open(ifile).readlines()
 	############################################################################################START OF CASE SCRIPTS
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
+		print 'OUTPUT DIRECTORY ./'+outdir+' NOT FOUND, CREATING DIRECTORY\n'
 	if itype == 'soft':
 		import georead
 		OB = georead.ob_transform(D_Obj, identifier=idf, enum=True, targetCategory=targetCategory, targetClass=targetClass)
@@ -107,34 +112,37 @@ def preprocess(argv):
 		if p_cutoff != 0:
 			from geo2moses import pvalFilter
 			OB = pvalFilter(OB,p_cutoff)
-		M_ob = georead.ob2moses(OB)
-		if not os.path.exists(outdir):
-			os.makedirs(outdir)
-			print 'OUTPUT DIRECTORY ./'+outdir+' NOT FOUND, CREATING DIRECTORY\n'
+		M_ob = georead.std2moses(OB)
 		if binarize == (True or 1):
 			print 'BINARIZING DATASET'
 			M_ob = georead.binarizeMoses(M_ob)
-		##########################################################################################################
-		if otype == 'moses':
-			writeMoses(M_ob, outdir+'/'+ofile, '\t') 
-		elif otype == 'svm':
-			writeSVM(M_ob, outdir+'/'+ofile) 
-		print str(M_ob.shape[0]-1) + ' Samples, ' + str(M_ob.shape[1]) + ' Features'
+##########################################################################################################
 	elif itype == 'moses':
 		print itype
 	elif itype == 'svm':
 		print itype
-	elif itype in ['txt','dat','text']:
+	elif itype in ['txt','dat','text','tab']:
 		#INFER INTERNAL DATA TYPE (SNP/MICROARRAY)
 		print 'INPUT TYPE \''+itype+'\' (Generic flatfile) IS AMBIBUOUS, PLEASE SPECIFY DATA TYPE:'
 		dtypes = {1:'microarray', 2:'snp'}
 		for x in dtypes:
 			print '\t'+str(x)+': '+dtypes[x]
 		itype = dtypes[int(raw_input("\nCHOOSE DATA TYPE: "))]
-		if itype == 'snp':
-			print 'ENTERING SNP PROCESSING PORTOCOOL:'
-			from snptransform import *
-		print itype
+	if itype == 'snp':
+		print 'ENTERING SNP PROCESSING PORTOCOOL:'
+		from snptransform import *
+		import georead
+		D_Obj = processSNP(D_Obj,targetCategory)
+		#for x in D_Obj:
+		#	print len(x)
+		M_ob = georead.std2moses(list(D_Obj))
+##########################################################################################################
+	if otype == 'moses':
+		writeMoses(M_ob, outdir+'/'+ofile, '\t') 
+	elif otype == 'svm':
+		writeSVM(M_ob, outdir+'/'+ofile)
+	print str(M_ob.shape[0]-1) + ' Samples, ' + str(M_ob.shape[1]) + ' Features'
+
 
 if __name__ == "__main__":
 	preprocess(sys.argv[1:])
